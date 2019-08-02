@@ -8,31 +8,29 @@ int direction8[3] = {0,-1,1};
 
 int main(int argc, const char * argv[]) {
     int x,y,player=black;
-    int inputNumber[2];
     int reValue;
     initializeBoard();
     printFirst();
     while(1){
-        printBoard();//盤面出力
-        printPlayer(player);//playerの出力
-        reValue = validate(inputNumber);//入力受付
-        if(reValue==2){//終了させる
-            break;
-        }else if(reValue==1){//入力が間違っているなら
+        printBoard();
+        printPlayer(player);
+        reValue = validate(&x,&y);
+        if(reValue==1){//入力が間違っているなら
             continue;
         }
-        x = inputNumber[0];
-        y = inputNumber[1];
-        if(putStone(x,y,player)==1){//入力箇所に石が置けないなら
+//        if(putStone(x,y,player)==1){//入力箇所に石が置けないなら
+//            continue;
+//        }
+        if(canPutStoneToSquare(x,y,player,1)==1){
             continue;
         }
-        player = anotherPlayer(player);//playerの切り替え
-        if(whToPass(player) == 1){//石を置ける場所が無いなら
-            player = anotherPlayer(player);
-            if(whToPass(player) == 1){//石を置ける場所がないならゲーム終了
+        player = changePlayer(player);
+        if(canPutStoneToBoard(player) == 1){//石を置ける場所が無いなら
+            player = changePlayer(player);
+            if(canPutStoneToBoard(player) == 1){//石を置ける場所がないならゲーム終了
                 printBoard();
                 println("Game Finish!");
-                whoWin();//勝者の出力
+                whoWin();
                 break;
             }else{
                 println("You cannot put stone. Pass your turn.");
@@ -60,7 +58,9 @@ void printFirst(void){//初回のゲーム説明
     printf("\"%s\".\n",whiteStone);
 }
 
-int anotherPlayer(int player){//playerの切り替え
+int changePlayer(int player){
+    //playerの切り替えを行う
+    //playerは1または2
     return 3-player;
 }
 
@@ -137,11 +137,12 @@ void whoWin(){//勝者を判定し出力する
     }
 }
 
-int putStone(int x,int y,int player){
-    //与えられた(x,y)に石がおけるか判定し、置ける場合はひっくり返す処理を行う
-    int enemy = anotherPlayer(player);
+
+int canPutStoneToSquare(int x, int y, int player, int isTurnOver){
+    //与えられた(x,y)に石がおけるか判定し、isTurnOverが1かつ置ける場合はひっくり返す処理を行う
+    int enemy = changePlayer(player);
     int frag = 1;
-    if(board[y][x]!=none){//入力場所にすでに石がある
+    if(board[y][x]!=none&&isTurnOver==1){//入力場所にすでに石がある
         println("You cannot put stone here!");
         return 1;
     }
@@ -156,16 +157,23 @@ int putStone(int x,int y,int player){
                     n+=1;
                 }
                 if(boardValue(y+n*diry,x+n*dirx)==player){//敵の石を自分の石で挟めるか
-                    for(int k=1;k<n;k++){//敵の石をひっくり返す
-                        board[y+k*diry][x+k*dirx]=player;
+                    if(isTurnOver==1){
+                        for(int k=1;k<n;k++){//敵の石をひっくり返す
+                            board[y+k*diry][x+k*dirx]=player;
+                        }
+                        frag = 0;
+                    }else{
+                        return 0;
                     }
-                    frag = 0;
+
                 }
             }
         }
     }
     if(frag == 1){//入力場所に石をおいてもひっくり返せる石が無い
-        println("There is no stone that can be turned over.");
+        if(isTurnOver==1){
+            println("There is no stone that can be turned over.");
+        }
         return 1;
     }else{
         board[y][x]=player;
@@ -173,34 +181,12 @@ int putStone(int x,int y,int player){
     }
 }
 
-int canPutStone(int x,int y,int player){
-    //与えられた(x,y)に石がおけるか判定する
-    int enemy = anotherPlayer(player);
-    int dirx,diry,n;
-    for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            dirx = direction8[j];
-            diry = direction8[i];
-            n=1;
-            if((dirx!=0||diry!=0)&&boardValue(y+diry,x+dirx)==enemy){//(x,y)の周囲マスに敵の石があるか
-                while(boardValue(y+n*diry,x+n*dirx)==enemy){
-                    n+=1;
-                }
-                if(boardValue(y+n*diry,x+n*dirx)==player){//敵の石を自分の石で挟めるか
-                    return 0;//一箇所でも石を置ける場所が存在する
-                }
-            }
-        }
-    }
-    return 1;
-}
-
-int whToPass(player){//playerにとって石を置ける場所が存在するかどうか
+int canPutStoneToBoard(player){//playerにとって石を置ける場所が存在するかどうか
     int frag;
     for(int i=0;i<boardSize;i++){
         for(int j=0;j<boardSize;j++){
             if(board[i][j]==none){
-                frag = canPutStone(j,i,player);
+                frag = canPutStoneToSquare(j, i, player,0);
                 if(frag == 0){//一箇所でも石を置ける場所があれば
                     return 0;
                 }
@@ -210,25 +196,22 @@ int whToPass(player){//playerにとって石を置ける場所が存在するか
     return 1;//石を置けない
 }
 
-int validate(int inputNumber[2]){//入力のチェック
+int validate(int *x,int *y){//入力のチェック
     char input[4];
     scanf("%3s%*[^\n]%*c",input);
     println(input);
-    if(input[0]=='c'){//cが入力されたら強制終了する
-        return 2;
-    }
     if(input[1]!=','){
         println("Input format is wrong!");
         return 1;
     }
-    int x = input[0] - '0';
-    int y = input[2] - '0';
-    if(x<0||x>boardSize-1||y<0||y>boardSize-1){//入力された数値が盤面の範囲外
+    int xInput = input[0] - '0';
+    int yInput = input[2] - '0';
+    if(xInput<0||xInput>boardSize-1||yInput<0||yInput>boardSize-1){//入力された数値が盤面の範囲外
         println("Can't put stone here!");
         return 1;
     }else{
-        inputNumber[0]=x;
-        inputNumber[1]=y;
+        (*x)=xInput;
+        (*y)=yInput;
     }
     return 0;
 }
